@@ -87,22 +87,42 @@ python youtube-data-fetcher.py
 ## Example Output
 
 ```text
-enter the name : nigthcore
+=== YouTube Fetcher Console UI ===
+1 - Search videos
+2 - Search playlists
+3 - List videos by topic
+4 - List playlists by topic
+5 - Exit
+Enter choice: 1
+Enter search query: nightcore hardstyle
+Max results (default 10): 10       
+Topics (comma-separated): nightcore,songs
+[OK] Topic already exists: 1 | nightcore
+[OK] Topic created: 2 | songs
 
-title : Nightcore - Apollo - (Lyrics)
-Url : https://www.youtube.com/watch?v=TpIqDm031gg
+Saving to database...
 
-title : Nightcore - Teeth (But it hits hard) (Lyrics)
-Url : https://www.youtube.com/watch?v=i5KjN0GXumw
-
-title : Nightcore - Older // Sasha Sloan (Lyrics)
-Url : https://www.youtube.com/watch?v=mgYR5fp161Y
-
-title : Nightcore - No Friends (Lyrics)
-Url : https://www.youtube.com/watch?v=9xG5aPvrS-k
-
-title : Nightcore - House of Memories (Lyrics)
-Url : https://www.youtube.com/watch?v=ee8ROcjVpvg
+=== Results (10) ===
+1. [Nightcore - Hardstyle Mix [1 hour] #21] — Fr3shDs4
+   -> https://www.youtube.com/watch?v=IsKrbjxJHnE
+2. [Nightcore | Canon in D (Jatimatic Hardstyle Bootleg)] — Mine
+   -> https://www.youtube.com/watch?v=DUR21pca1oY
+3. [Old School Classic Nightcore Mix | Complete 2011 to 2021 Hottest Songs] — AxionX
+   -> https://www.youtube.com/watch?v=xfjnN3sXYhk
+4. [Ultra Ultra Masculine White Girl Playlist [Hardstyle Mix]] — 5MO
+   -> https://www.youtube.com/watch?v=yRvodjtCMJo
+5. [Nightcore - How Do You Do] — Nightcore Lab NCL
+   -> https://www.youtube.com/watch?v=0GEX_sVwUn4
+6. [Russian Nightcore Hardstyle Playlist|Русский Найткор Хардстайл Плейлист] — Nyctereute
+   -> https://www.youtube.com/watch?v=xve6mJYT270
+7. [Nightcore - Stamp On The Ground (Lyrics)] — Nightcore Zodiac
+   -> https://www.youtube.com/watch?v=dwhnsV9yhZw
+8. [[NIGHTCORE] WE ARE CHARLIE KIRK (Agartha Hardstyle Remix)] — Dirtman Grassy
+   -> https://www.youtube.com/watch?v=tlOdillu4FI
+9. [Nightcore - Clarity] — NightcoreReality
+   -> https://www.youtube.com/watch?v=9buluPWlkAA
+10. [i kissed a girl (hardstyle)] — singedJAM
+   -> https://www.youtube.com/watch?v=8sIJNHn1uyc
 ```
 
 ## Project Idea
@@ -116,11 +136,10 @@ This project is designed to be expanded later into a larger tool that can:
 ## Future Improvements
 
 Planned next steps:
-- Add playlist search.
 - Add channel search.
-- Save results into a database.
 - Add duplicate handling.
 - Build visuals based on search history.
+- Quality metrics
 - Add filters for date, channel, or keyword.
 
 ## Notes
