@@ -4,6 +4,9 @@ import time
 import hashlib
 from dotenv import load_dotenv
 from typing import Optional, List, Dict, Tuple
+from learning_db import (init_db,upsert_video,upsert_playlist,
+                         cli_add_video,cli_add_playlist,cli_list_videos_by_topic,
+                         cli_list_playlists_by_topic,cli_add_topic)
 load_dotenv()
 
 try:
@@ -135,56 +138,92 @@ def search_videos(youtube, query: str, maxResults: int = 10, type_: str = "video
 def console_ui(API_key: str):
     youtube = youtube_build(API_key)
     logging.info("YouTube service client created.")
-
+    init_db()
     while True:
         print("\n=== YouTube Fetcher Console UI ===")
         print("1 - Search videos")
         print("2 - Search playlists")
-        print("3 - Search channels")
-        print("4 - Exit")
+        print("3 - List videos by topic")
+        print("4 - List playlists by topic")
+        print("5 - Exit")
+        
         try:
             choice = int(input("Enter choice: ").strip())
+
         except ValueError:
             print("Invalid input. Try again.")
             continue
 
-        if choice == 4:
+        if choice == 5:
             print("Exiting...")
             break
 
-        if choice not in (1, 2, 3):
+        if choice == 1:
+            query = input("Enter search query: ").strip()
+            max_results = int(input("Max results (default 10): ").strip() or "10")
+            topics_input = input("Topics (comma-separated): ").strip()
+            topics = [t.strip() for t in topics_input.split(",") if t.strip()]
+            
+            for tname in topics:
+                cli_add_topic(tname)
+            
+            results = search_videos(youtube, query, maxResults=max_results, type_="video")
+            
+            if results:
+                print("\nSaving to database...")
+                for r in results:
+                    upsert_video(
+                        youtube_id=r["videoId"],
+                        title=r["title"],
+                        channel=r["channel"],
+                        url=r["url"],
+                        topics=topics,
+                        is_verified=False
+                    )
+                
+                print(f"\n=== Results ({len(results)}) ===")
+                for i, r in enumerate(results, start=1):
+                    print(f"{i}. [{r['title']}] — {r['channel']}")
+                    print(f"   -> {r['url']}")
+        
+        elif choice == 2:
+            query = input("Enter search query: ").strip()
+            max_results = int(input("Max results (default 5): ").strip() or "5")
+            topics_input = input("Topics (comma-separated): ").strip()
+            topics = [t.strip() for t in topics_input.split(",") if t.strip()]
+            
+            for tname in topics:
+                cli_add_topic(tname)
+            
+            results = search_videos(youtube, query, maxResults=max_results, type_="playlist")
+            
+            if results:
+                print("\nSaving to database...")
+                for r in results:
+                    upsert_playlist(
+                        youtube_id=r["playlistId"],
+                        title=r["title"],
+                        channel=r["channel"],
+                        url=r["url"],
+                        topics=topics,
+                        is_verified=False
+                    )
+                
+                print(f"\n=== Results ({len(results)}) ===")
+                for i, r in enumerate(results, start=1):
+                    print(f"{i}. [{r['title']}] — {r['channel']}")
+                    print(f"   -> {r['url']}")
+        
+        elif choice == 3:
+            topic = input("Enter topic name: ").strip()
+            cli_list_videos_by_topic(topic)
+        
+        elif choice == 4:
+            topic = input("Enter topic name: ").strip()
+            cli_list_playlists_by_topic(topic)
+        
+        else:
             print("Invalid choice. Try again.")
-            continue
-
-        query = input("Enter search query: ").strip()
-        if not query:
-            print("Query cannot be empty.")
-            continue
-
-        max_results_input = input("Max results (default 10): ").strip()
-        max_results = int(max_results_input) if max_results_input.isdigit() else 10
-        if max_results <= 0 or max_results > 100:
-            print("Max results must be between 1 and 100. Using default 10.")
-            max_results = 10
-
-        type_map = {1: "video", 2: "playlist", 3: "channel"}
-        type_ = type_map[choice]
-
-        logging.info(f"Searching {type_} for query='{query}', maxResults={max_results}")
-        results = search_videos(youtube, query, maxResults=max_results, type_=type_)
-
-        if not results:
-            print(f"\nNo results found for query: {query}\n")
-            continue
-
-        print(f"\n=== Results ({len(results)}) ===")
-        for i, r in enumerate(results, start=1):
-            title = r["title"]
-            channel = r["channel"]
-            url = r["url"]
-            print(f"{i}. [{title}] — {channel}")
-            print(f"   -> Clickable link: {url}")
-        print()
 
 
 def main():

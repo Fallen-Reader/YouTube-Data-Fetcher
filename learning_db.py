@@ -13,8 +13,9 @@ load_dotenv()
 
 #DB Setup
 
-DB_PATH = os.getenv("DB_PATH",default=None)
- 
+DB_PATH = os.getenv("DB_PATH",default="Learning_lib.db")
+
+print(f"{DB_PATH}") 
 engine = create_engine(f"sqlite:///{DB_PATH}", echo=False, future=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 Base = declarative_base()
