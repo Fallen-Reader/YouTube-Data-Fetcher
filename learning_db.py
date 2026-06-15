@@ -168,7 +168,8 @@ def upsert_video(
                 uploaded_at=uploaded_at,
             )
             sess.add(existing)
-
+            sess.flush()
+            
         # link topics
         if topics:
             for tname in topics:
@@ -223,7 +224,7 @@ def upsert_playlist(
                 item_count=item_count,
             )
             sess.add(existing)
-
+            sess.flush()
         # link topics
         if topics:
             for tname in topics:

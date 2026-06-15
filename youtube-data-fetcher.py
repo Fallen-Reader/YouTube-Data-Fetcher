@@ -135,6 +135,23 @@ def search_videos(youtube, query: str, maxResults: int = 10, type_: str = "video
     logging.info(f"Search returned {len(results)} results for query: {query}")
     return results
 
+def handle_search(youtube, type_: str, default_max: int = 10):
+    query = input("Enter search query: ").strip()
+    try:
+        max_results = int(input(f"Max results (default {default_max}): ").strip() or str(default_max))
+        max_results = max(1, min(max_results, 100))
+
+    except ValueError:
+        max_results = default_max
+
+    topics_input = input("Topics (comma-separated): ").strip()
+    topics = [t.strip() for t in topics_input.split(",") if t.strip()]
+    for t in topics:
+        cli_add_topic(t)
+        
+    results = search_videos(youtube, query, maxResults=max_results, type_=type_)
+    return results, topics
+   
 def console_ui(API_key: str):
     youtube = youtube_build(API_key)
     logging.info("YouTube service client created.")
@@ -159,16 +176,7 @@ def console_ui(API_key: str):
             break
 
         if choice == 1:
-            query = input("Enter search query: ").strip()
-            max_results = int(input("Max results (default 10): ").strip() or "10")
-            topics_input = input("Topics (comma-separated): ").strip()
-            topics = [t.strip() for t in topics_input.split(",") if t.strip()]
-            
-            for tname in topics:
-                cli_add_topic(tname)
-            
-            results = search_videos(youtube, query, maxResults=max_results, type_="video")
-            
+            results,topics = handle_search(youtube,type_="video")
             if results:
                 print("\nSaving to database...")
                 for r in results:
@@ -187,16 +195,7 @@ def console_ui(API_key: str):
                     print(f"   -> {r['url']}")
         
         elif choice == 2:
-            query = input("Enter search query: ").strip()
-            max_results = int(input("Max results (default 5): ").strip() or "5")
-            topics_input = input("Topics (comma-separated): ").strip()
-            topics = [t.strip() for t in topics_input.split(",") if t.strip()]
-            
-            for tname in topics:
-                cli_add_topic(tname)
-            
-            results = search_videos(youtube, query, maxResults=max_results, type_="playlist")
-            
+            results,topics = handle_search(youtube,type_="playlist")
             if results:
                 print("\nSaving to database...")
                 for r in results:
