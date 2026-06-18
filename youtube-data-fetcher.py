@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 import time
 import hashlib
@@ -135,6 +136,46 @@ def search_videos(youtube, query: str, maxResults: int = 10, type_: str = "video
     logging.info(f"Search returned {len(results)} results for query: {query}")
     return results
 
+def fetch_video_metrics(youtube,video_ids : list) -> dict:
+    if not video_ids:
+        return {}
+    
+    metrics = {}
+
+    for i in range(0,len(video_ids,50)):
+        batch = video_ids[i:i+50]
+        id_str = ",".join(batch)
+
+        try:
+            req = youtube.videos().list(
+                part="statistics,contentDeatails",
+                id = id_str
+            )
+            resp = req.execute()
+
+            for item in resp.get("items",[]):
+                video_id = item["id"]
+                stats = item["statistics"]
+                content = item["contentDetails"]
+
+                metrics[video_id]={
+                    "views":int(stats.get("viewCount",0)),
+                    "likes":int(stats.get("likeCount",0)),
+                    "comments":int(stats.get("commentCount",0)),
+                    "duration_seconds": parse_duration(content.get("duration", "PT0S")) 
+                }
+        
+        except google_errors.HttpError as e:
+            status = getattr(e,"status_code",None)
+            if status == 403:
+                print("Quota exceeded(403). Stopping metrics fetch")
+                break
+            else:
+                print(f"API error , status = {stats}\nmsg={str(e)}")
+                continue
+    return metrics
+
+
 def handle_search(youtube, type_: str, default_max: int = 10):
     query = input("Enter search query: ").strip()
     try:
@@ -179,8 +220,9 @@ def console_ui(API_key: str):
             results,topics = handle_search(youtube,type_="video")
             if results:
                 print("\nSaving to database...")
+                saved_videos =[]
                 for r in results:
-                    upsert_video(
+                    video = upsert_video(
                         youtube_id=r["videoId"],
                         title=r["title"],
                         channel=r["channel"],
@@ -188,6 +230,26 @@ def console_ui(API_key: str):
                         topics=topics,
                         is_verified=False
                     )
+                    saved_videos(video)
+                    print(f"[Saved] Video: {video.id} | {video.title}")
+                
+                print("\nFetching metrics (views, likes, duration)...")
+                video_ids = [v.youtube_id for v in saved_videos[:10]]
+
+                metrics = fetch_video_metrics(youtube,video_ids)
+
+                print("Updating database with metrics")
+
+                for video in saved_videos[:10]:
+                    if video.youtube_id in metrics:
+                        m = metrics[video.youtube_id]
+                        video.views = m["views"]
+                        video.likes = m["likes"]
+                        video.comments = m["comments"]
+                        video.duration_seconds = m["duration_seconds"]
+                        sess = get_session()
+                        sess.commit()
+                        sess.close()
                 
                 print(f"\n=== Results ({len(results)}) ===")
                 for i, r in enumerate(results, start=1):
