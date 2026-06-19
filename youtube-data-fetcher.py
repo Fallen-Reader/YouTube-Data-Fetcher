@@ -1,11 +1,12 @@
 import os
 import re
+import isodate
 import logging
 import time
 import hashlib
 from dotenv import load_dotenv
 from typing import Optional, List, Dict, Tuple
-from learning_db import (init_db,upsert_video,upsert_playlist,
+from learning_db import (init_db,upsert_video,upsert_playlist,get_session,
                          cli_add_video,cli_add_playlist,cli_list_videos_by_topic,
                          cli_list_playlists_by_topic,cli_add_topic)
 load_dotenv()
@@ -142,13 +143,13 @@ def fetch_video_metrics(youtube,video_ids : list) -> dict:
     
     metrics = {}
 
-    for i in range(0,len(video_ids,50)):
-        batch = video_ids[i:i+50]
+    for i in range(0,len(video_ids)):
+        batch = video_ids[i:i+10]
         id_str = ",".join(batch)
 
         try:
             req = youtube.videos().list(
-                part="statistics,contentDeatails",
+                part="statistics,contentDetails",
                 id = id_str
             )
             resp = req.execute()
@@ -171,10 +172,90 @@ def fetch_video_metrics(youtube,video_ids : list) -> dict:
                 print("Quota exceeded(403). Stopping metrics fetch")
                 break
             else:
-                print(f"API error , status = {stats}\nmsg={str(e)}")
+                print(f"API error , status = {status}\nmsg={str(e)}")
                 continue
     return metrics
 
+def parse_duration(duration_str: str) -> int:
+    hours = int(re.search(r"(\d+)H", duration_str).group(1) or 0) if re.search(r"(\d+)H", duration_str) else 0
+    minutes = int(re.search(r"(\d+)M", duration_str).group(1) or 0) if re.search(r"(\d+)M", duration_str) else 0
+    seconds = int(re.search(r"(\d+)S", duration_str).group(1) or 0) if re.search(r"(\d+)S", duration_str) else 0
+    
+    return hours * 3600 + minutes * 60 + seconds
+
+def calculate_quality_score(video:Video) -> float:
+    views = video.views or 0
+    likes = video.likes or 0
+    comments = video.comments or 0
+    duration = video.duration_secconds or 0
+    uploaded = video.uploaded_at
+
+    engagment_ratio = 0
+    if views >0:
+        engagment_ratio = min(likes/views,1)
+    
+    engagement_score = min(engagment_ratio/0.1,1.0)
+
+    if views ==0:
+        authority_score = 0
+    else:
+        import math
+        log_view = math.log10(views+1)
+        authority_score = min((log_view-1)/7,1.0)
+    
+    if uploaded is None:
+        uploaded = video.added_at
+    
+    if uploaded is not None:
+        days_old = (time.datetime.now(time.timezone.utc) - uploaded).days
+        freshness_score = max(1.0-(days_old/365),0)
+    else:
+        freshness_score = 0.5
+    
+    if duration == 0:
+        duration_score = 0.5
+    elif duration <60:
+        duration_score = 0.2
+    elif duration <300:
+        duration_score = 0.5
+    elif duration <=1800:
+        duration_score = 0.6
+    elif duration <= 3600:
+        duration_score = 0.8
+    else:
+        duration_score = 0.7
+    
+    relevance_score = 0.8
+
+    score = (
+        0.4 * relevance_score +
+        0.2 * engagement_score +
+        0.2 * authority_score +
+        0.1 * freshness_score +
+        0.1 * duration_score
+    )
+
+    return round(score,3)
+
+def calculate_playlist_score(playlist: Playlist) -> float:
+    
+    item_count = playlist.item_count or 0
+    
+    if item_count == 0:
+        score = 0.3
+    elif item_count < 5:
+        score = 0.5
+    elif item_count < 20:
+        score = 0.8
+    elif item_count < 50:
+        score = 0.9
+    else:
+        score = 1.0
+    
+    if playlist.is_verified:
+        score = min(score + 0.1, 1.0)
+    
+    return round(score, 3)
 
 def handle_search(youtube, type_: str, default_max: int = 10):
     query = input("Enter search query: ").strip()
@@ -230,14 +311,13 @@ def console_ui(API_key: str):
                         topics=topics,
                         is_verified=False
                     )
-                    saved_videos(video)
-                    print(f"[Saved] Video: {video.id} | {video.title}")
+                    saved_videos.append(video)
                 
                 print("\nFetching metrics (views, likes, duration)...")
                 video_ids = [v.youtube_id for v in saved_videos[:10]]
-
+                print(video_ids,"\n")
                 metrics = fetch_video_metrics(youtube,video_ids)
-
+                
                 print("Updating database with metrics")
 
                 for video in saved_videos[:10]:
