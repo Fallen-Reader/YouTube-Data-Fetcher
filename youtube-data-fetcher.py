@@ -1,14 +1,18 @@
 import os
 import re
-import isodate
 import logging
 import time
 import hashlib
+from datetime import datetime,timezone
 from dotenv import load_dotenv
 from typing import Optional, List, Dict, Tuple
-from learning_db import (init_db,upsert_video,upsert_playlist,get_session,
-                         cli_add_video,cli_add_playlist,cli_list_videos_by_topic,
-                         cli_list_playlists_by_topic,cli_add_topic)
+
+from learning_db import (
+    init_db, upsert_video, upsert_playlist, get_session,
+    cli_add_video, cli_add_playlist, cli_list_videos_by_topic,
+    cli_list_playlists_by_topic, cli_add_topic, Video, Playlist
+)
+
 load_dotenv()
 
 try:
@@ -28,9 +32,11 @@ logging.basicConfig(
     filemode="a"
 )
 
+
 CACHE: Dict[str, Tuple[List[Dict], float]] = {}
 CACHE_TTL = 30 * 60  # 30 minutes
 CACHE_MAX_SIZE = 200
+
 
 def _cache_key(query: str, type_: str = "video", maxResults: int = 10) -> str:
     return hashlib.md5(f"{query}|{type_.lower()}|{maxResults}".encode()).hexdigest()
@@ -46,7 +52,7 @@ def cache_get(key: str) -> Optional[List[Dict]]:
     return results
 
 
-def get_timestamp(k:str) -> float:
+def get_timestamp(k: str) -> float:
     return CACHE[k][1]
 
 
@@ -56,8 +62,10 @@ def cache_put(key: str, results: List[Dict]) -> None:
         CACHE.pop(oldest, None)
     CACHE[key] = (results, time.time())
 
+
 def youtube_build(api_key: str):
     return build("youtube", "v3", developerKey=api_key)
+
 
 def search_videos(youtube, query: str, maxResults: int = 10, type_: str = "video") -> List[Dict]:
 
@@ -137,45 +145,50 @@ def search_videos(youtube, query: str, maxResults: int = 10, type_: str = "video
     logging.info(f"Search returned {len(results)} results for query: {query}")
     return results
 
-def fetch_video_metrics(youtube,video_ids : list) -> dict:
+
+def fetch_video_metrics(youtube, video_ids: list) -> dict:
     print(f"Fetching metrics (views, likes, duration)...")
     if not video_ids:
         return {}
     
     metrics = {}
 
-    for i in range(0,len(video_ids)):
+    for i in range(0, len(video_ids), 10):
         batch = video_ids[i:i+10]
         id_str = ",".join(batch)
 
         try:
             req = youtube.videos().list(
                 part="statistics,contentDetails",
-                id = id_str
+                id=id_str
             )
             resp = req.execute()
 
-            for item in resp.get("items",[]):
+            for item in resp.get("items", []):
                 video_id = item["id"]
                 stats = item["statistics"]
                 content = item["contentDetails"]
 
-                metrics[video_id]={
-                    "views":int(stats.get("viewCount",0)),
-                    "likes":int(stats.get("likeCount",0)),
-                    "comments":int(stats.get("commentCount",0)),
+                likes = stats.get("likeCount")
+                likes = int(likes) if likes is not None else None
+
+                metrics[video_id] = {
+                    "views": int(stats.get("viewCount", 0)),
+                    "likes": likes,
+                    "comments": int(stats.get("commentCount", 0)),
                     "duration_seconds": parse_duration(content.get("duration", "PT0S")) 
                 }
         
         except google_errors.HttpError as e:
-            status = getattr(e,"status_code",None)
+            status = getattr(e, "status_code", None)
             if status == 403:
-                print("Quota exceeded(403). Stopping metrics fetch")
+                print("Quota exceeded (403). Stopping metrics fetch")
                 break
             else:
-                print(f"API error , status = {status}\nmsg={str(e)}")
+                print(f"API error, status = {status}\nmsg={str(e)}")
                 continue
     return metrics
+
 
 def parse_duration(duration_str: str) -> int:
     hours = int(re.search(r"(\d+)H", duration_str).group(1) or 0) if re.search(r"(\d+)H", duration_str) else 0
@@ -184,47 +197,48 @@ def parse_duration(duration_str: str) -> int:
     
     return hours * 3600 + minutes * 60 + seconds
 
-def calculate_quality_score(video:Video) -> float:
+
+def calculate_quality_score(video: Video) -> float:
     views = video.views or 0
     likes = video.likes or 0
     comments = video.comments or 0
-    duration = video.duration_secconds or 0
+    duration = video.duration_seconds or 0  # FIXED: was duration_secconds
     uploaded = video.uploaded_at
 
-    engagment_ratio = 0
-    if views >0:
-        engagment_ratio = min(likes/views,1)
+    engagement_ratio = 0
+    if views > 0:
+        engagement_ratio = min(likes / views, 1)
     
-    engagement_score = min(engagment_ratio/0.1,1.0)
-
-    if views ==0:
+    engagement_score = min(engagement_ratio / 0.1, 1.0)
+    authority_score = 0
+    if views == 0:
         authority_score = 0
     else:
         import math
-        log_view = math.log10(views+1)
-        authority_score = min((log_view-1)/7,1.0)
+        log_view = math.log10(views + 1)
+        authority_score = min((log_view - 1) / 7, 1.0)
     
     if uploaded is None:
         uploaded = video.added_at
     
     if uploaded is not None:
-        days_old = (time.datetime.now(time.timezone.utc) - uploaded).days
-        freshness_score = max(1.0-(days_old/365),0)
+        days_old = (datetime.now(timezone.utc) - uploaded).days 
+        freshness_score = max(1.0 - (days_old / 365), 0)
     else:
         freshness_score = 0.5
     
     if duration == 0:
         duration_score = 0.5
-    elif duration <60:
+    elif duration < 60:
         duration_score = 0.2
-    elif duration <300:
+    elif duration < 300:
         duration_score = 0.5
-    elif duration <=1800:
-        duration_score = 0.6
+    elif duration <= 1800:
+        duration_score = 1.0 
     elif duration <= 3600:
         duration_score = 0.8
     else:
-        duration_score = 0.7
+        duration_score = 0.6 
     
     relevance_score = 0.8
 
@@ -236,7 +250,8 @@ def calculate_quality_score(video:Video) -> float:
         0.1 * duration_score
     )
 
-    return round(score,3)
+    return round(score, 3)
+
 
 def calculate_playlist_score(playlist: Playlist) -> float:
     
@@ -258,6 +273,7 @@ def calculate_playlist_score(playlist: Playlist) -> float:
     
     return round(score, 3)
 
+
 def handle_search(youtube, type_: str, default_max: int = 10):
     query = input("Enter search query: ").strip()
     try:
@@ -267,33 +283,50 @@ def handle_search(youtube, type_: str, default_max: int = 10):
     except ValueError:
         max_results = default_max
 
+
     topics_input = input("Topics (comma-separated): ").strip()
-    topics:list[str] = [t.strip() for t in topics_input.split(",") if t.strip()]
+    topics: list[str] = [t.strip() for t in topics_input.split(",") if t.strip()]
     for t in topics:
         cli_add_topic(t)
         
-    results:list[dict] = search_videos(youtube, query=query , maxResults=max_results, type_=type_)
+    results: list[dict] = search_videos(youtube, query=query, maxResults=max_results, type_=type_)
     return results, topics
 
-def SaveToDB_vd(results:dict,topics:list,metrics:dict) -> None:
+
+def SaveToDB_vd(results: list, topics: list, metrics: dict) -> None:
 
     print("\nSaving to database...")
 
-    for r,id in results:
-        id:str= r["videoId"]
+    for r in results:
+        video_id = r["videoId"]
+                
+        video_metrics = metrics.get(video_id, {})
+        
         upsert_video(
-                youtube_id=r["videoId"],
-                title=r["title"],
-                channel=r["channel"],
-                url=r["url"],
-                topic=topics,
-                is_verified=False,
-                views= metrics[id].get("views") or None,
-                likes= metrics[id].get("likes") or None,
-                duration_seconds= metrics[id].get("duration_seconds")
-            )
-            
-             
+            youtube_id=video_id,
+            title=r["title"],
+            channel=r["channel"],
+            url=r["url"],
+            topics=topics,  
+            is_verified=False,
+            views=video_metrics.get("views") or None,
+            likes=video_metrics.get("likes") or None,
+            duration_seconds=video_metrics.get("duration_seconds") or None
+        )
+
+def SaveToDB_pl(results: list, topics: list) -> None:
+    print("\nSaving to database...")
+    for r in results:
+        upsert_playlist(
+            youtube_id=r["playlistId"],
+            title=r["title"],
+            channel=r["channel"],
+            url=r["url"],
+            topics=topics,
+            is_verified=False
+        )
+
+
 def console_ui(API_key: str):
     youtube = youtube_build(API_key)
     logging.info("YouTube service client created.")
@@ -309,6 +342,7 @@ def console_ui(API_key: str):
         try:
             choice = int(input("Enter choice: ").strip())
 
+
         except ValueError:
             print("Invalid input. Try again.")
             continue
@@ -318,36 +352,27 @@ def console_ui(API_key: str):
             break
 
         if choice == 1:
-            results,topics = handle_search(youtube,type_="video")
-            metrics={}
+            results, topics = handle_search(youtube, type_="video")
+            metrics = {}
             if results:
-                video_ids =[v.get("videoId") for v in results]
-                metrics = fetch_video_metrics(youtube,video_ids)
+                video_ids = [v.get("videoId") for v in results]
+                metrics = fetch_video_metrics(youtube, video_ids)
 
                 SaveToDB_vd(
                     results=results,
                     topics=topics,
                     metrics=metrics
                 )
-                
+
                 print(f"\n=== Results ({len(results)}) ===")
                 for i, r in enumerate(results, start=1):
                     print(f"{i}. [{r['title']}] — {r['channel']}")
                     print(f"   -> {r['url']}")
         
         elif choice == 2:
-            results,topics = handle_search(youtube,type_="playlist")
+            results, topics = handle_search(youtube, type_="playlist")
             if results:
-                print("\nSaving to database...")
-                for r in results:
-                    upsert_playlist(
-                        youtube_id=r["playlistId"],
-                        title=r["title"],
-                        channel=r["channel"],
-                        url=r["url"],
-                        topics=topics,
-                        is_verified=False
-                    )
+                SaveToDB_pl(results, topics)
                 
                 print(f"\n=== Results ({len(results)}) ===")
                 for i, r in enumerate(results, start=1):
@@ -366,14 +391,18 @@ def console_ui(API_key: str):
             print("Invalid choice. Try again.")
 
 
+
 def main():
+
     API_key = os.getenv("API_KEY")
     if not API_key:
         print("ERROR: YT_API_KEY environment variable not set. Set it in .env or export YT_API_KEY=...")
         logging.error("YT_API_KEY not set")
         return
 
+
     console_ui(API_key)
+
 
 if __name__ == "__main__":
     main()
