@@ -30,6 +30,8 @@ The project currently focuses on:
 - pandas
 - logging
 - YouTube Data API v3
+- SQLalchemy
+- Cache Managment
 
 ## How It Works
 
@@ -54,7 +56,7 @@ For each video, the project can fetch:
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/Omniscient-Frame/YouTube-Data-Fetcher.git
+git clone https://github.com/Fallen-Reader/YouTube-Data-Fetcher.git
 ```
 
 ### 2. Install dependencies
@@ -94,35 +96,57 @@ python youtube-data-fetcher.py
 4 - List playlists by topic
 5 - Exit
 Enter choice: 1
-Enter search query: nightcore hardstyle
-Max results (default 10): 10       
-Topics (comma-separated): nightcore,songs
-[OK] Topic already exists: 1 | nightcore
-[OK] Topic created: 2 | songs
+Enter search query: probability for quants
+Max results (default 10): 5
+Topics (comma-separated): maths,education
+[OK] Topic already exists: 7 | maths
+[OK] Topic already exists: 3 | education
+Fetching metrics (views, likes, duration)...
 
 Saving to database...
 
-=== Results (10) ===
-1. [Nightcore - Hardstyle Mix [1 hour] #21] — Fr3shDs4
-   -> https://www.youtube.com/watch?v=IsKrbjxJHnE
-2. [Nightcore | Canon in D (Jatimatic Hardstyle Bootleg)] — Mine
-   -> https://www.youtube.com/watch?v=DUR21pca1oY
-3. [Old School Classic Nightcore Mix | Complete 2011 to 2021 Hottest Songs] — AxionX
-   -> https://www.youtube.com/watch?v=xfjnN3sXYhk
-4. [Ultra Ultra Masculine White Girl Playlist [Hardstyle Mix]] — 5MO
-   -> https://www.youtube.com/watch?v=yRvodjtCMJo
-5. [Nightcore - How Do You Do] — Nightcore Lab NCL
-   -> https://www.youtube.com/watch?v=0GEX_sVwUn4
-6. [Russian Nightcore Hardstyle Playlist|Русский Найткор Хардстайл Плейлист] — Nyctereute
-   -> https://www.youtube.com/watch?v=xve6mJYT270
-7. [Nightcore - Stamp On The Ground (Lyrics)] — Nightcore Zodiac
-   -> https://www.youtube.com/watch?v=dwhnsV9yhZw
-8. [[NIGHTCORE] WE ARE CHARLIE KIRK (Agartha Hardstyle Remix)] — Dirtman Grassy
-   -> https://www.youtube.com/watch?v=tlOdillu4FI
-9. [Nightcore - Clarity] — NightcoreReality
-   -> https://www.youtube.com/watch?v=9buluPWlkAA
-10. [i kissed a girl (hardstyle)] — singedJAM
-   -> https://www.youtube.com/watch?v=8sIJNHn1uyc
+=== Results (5) ===
+1. [How to Get Good at Probability &amp; Statistics (for Quants &amp; Finance Careers) 📚👩🏼‍💻] — Ioana Roman
+
+Video: How to Get Good at Probability &amp; Statistics (for Quants &amp; Finance Careers) 📚👩🏼‍💻
+Score: ███████░░░ (0.717)
+Views: 42713
+Likes: 1983
+Duration: 1035s
+   -> https://www.youtube.com/watch?v=zcnHYRxHSpU
+2. [Probability - Shortcuts &amp; Tricks for 2026 Placement Tests, Job Interviews &amp; Exams] — CareerRide
+
+Video: Probability - Shortcuts &amp; Tricks for 2026 Placement Tests, Job Interviews &amp; Exams
+Score: ██████░░░░ (0.663)
+Views: 1966936
+Likes: 30813
+Duration: 4058s
+   -> https://www.youtube.com/watch?v=ximxxERGSUc
+3. [Odd Tosses Probability | Citadel Quant Interview Problem] — quantprof 
+
+Video: Odd Tosses Probability | Citadel Quant Interview Problem
+Score: ██████░░░░ (0.606)
+Views: 7700
+Likes: 208
+Duration: 177s
+   -> https://www.youtube.com/watch?v=RdGdqNe8A8U
+4. [Math for Quantatative Finance] — The Math Sorcerer
+
+Video: Math for Quantatative Finance
+Score: ███████░░░ (0.707)
+Views: 119796
+Likes: 4231
+Duration: 337s
+   -> https://www.youtube.com/watch?v=8U0ksSGEHtc
+5. [Jane Street Interview Question] — quantprof 
+
+Video: Jane Street Interview Question
+Score: ██████░░░░ (0.605)
+Views: 354902
+Likes: 6224
+Duration: 22s
+   -> https://www.youtube.com/watch?v=sfFI28tM8Ds
+
 ```
 
 ## Project Idea
@@ -136,10 +160,10 @@ This project is designed to be expanded later into a larger tool that can:
 ## Future Improvements
 
 Planned next steps:
-- Add channel search.
+- Add channel search. 
 - Add duplicate handling.
 - Build visuals based on search history.
-- Quality metrics
+- Quality metrics. ✅
 - Add filters for date, channel, or keyword.
 
 ## Notes
