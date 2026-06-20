@@ -138,6 +138,7 @@ def search_videos(youtube, query: str, maxResults: int = 10, type_: str = "video
     return results
 
 def fetch_video_metrics(youtube,video_ids : list) -> dict:
+    print(f"Fetching metrics (views, likes, duration)...")
     if not video_ids:
         return {}
     
@@ -267,13 +268,32 @@ def handle_search(youtube, type_: str, default_max: int = 10):
         max_results = default_max
 
     topics_input = input("Topics (comma-separated): ").strip()
-    topics = [t.strip() for t in topics_input.split(",") if t.strip()]
+    topics:list[str] = [t.strip() for t in topics_input.split(",") if t.strip()]
     for t in topics:
         cli_add_topic(t)
         
-    results = search_videos(youtube, query, maxResults=max_results, type_=type_)
+    results:list[dict] = search_videos(youtube, query=query , maxResults=max_results, type_=type_)
     return results, topics
-   
+
+def SaveToDB_vd(results:dict,topics:list,metrics:dict) -> None:
+
+    print("\nSaving to database...")
+
+    for r,id in results:
+        id:str= r["videoId"]
+        upsert_video(
+                youtube_id=r["videoId"],
+                title=r["title"],
+                channel=r["channel"],
+                url=r["url"],
+                topic=topics,
+                is_verified=False,
+                views= metrics[id].get("views") or None,
+                likes= metrics[id].get("likes") or None,
+                duration_seconds= metrics[id].get("duration_seconds")
+            )
+            
+             
 def console_ui(API_key: str):
     youtube = youtube_build(API_key)
     logging.info("YouTube service client created.")
@@ -299,37 +319,16 @@ def console_ui(API_key: str):
 
         if choice == 1:
             results,topics = handle_search(youtube,type_="video")
+            metrics={}
             if results:
-                print("\nSaving to database...")
-                saved_videos =[]
-                for r in results:
-                    video = upsert_video(
-                        youtube_id=r["videoId"],
-                        title=r["title"],
-                        channel=r["channel"],
-                        url=r["url"],
-                        topics=topics,
-                        is_verified=False
-                    )
-                    saved_videos.append(video)
-                
-                print("\nFetching metrics (views, likes, duration)...")
-                video_ids = [v.youtube_id for v in saved_videos[:10]]
-                print(video_ids,"\n")
+                video_ids =[v.get("videoId") for v in results]
                 metrics = fetch_video_metrics(youtube,video_ids)
-                
-                print("Updating database with metrics")
 
-                for video in saved_videos[:10]:
-                    if video.youtube_id in metrics:
-                        m = metrics[video.youtube_id]
-                        video.views = m["views"]
-                        video.likes = m["likes"]
-                        video.comments = m["comments"]
-                        video.duration_seconds = m["duration_seconds"]
-                        sess = get_session()
-                        sess.commit()
-                        sess.close()
+                SaveToDB_vd(
+                    results=results,
+                    topics=topics,
+                    metrics=metrics
+                )
                 
                 print(f"\n=== Results ({len(results)}) ===")
                 for i, r in enumerate(results, start=1):
